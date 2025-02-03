@@ -1,1 +1,2 @@
-# AI-Capstone-Project
+# AI-Capstone-Project  
+member 1
