@@ -5,17 +5,19 @@ This project involves the development of a mental health AI chatbot named **Pand
 
 ---
 
+## **Run Application**
+- pip install -r requirements.txt
+- python app.py
+- Access the chatbot at http://127.0.0.1:5000
+
+---
+
 ## **Features**
 - Conversational AI that detects user sentiment (positive, neutral, negative)
 - Provides responses to various mental health scenarios
 - Implements guided exercises (e.g., deep breathing, mindfulness)
 - Answers frequently asked questions about mental health (e.g., depression, anxiety, mental well-being)
 - Multilingual greeting support (e.g., English, Spanish, French, etc.)
-
-## **Run Application**
-- pip install -r requirements.txt
-- python app.py
-- Access the chatbot at http://127.0.0.1:5000
 
 ---
 
