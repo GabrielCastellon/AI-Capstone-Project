@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Mental Health Chatbot</title>
+    <script>
+        async function sendMessage() {
+            const message = document.getElementById("messageInput").value;
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: message})
+            });
+            const data = await response.json();
+            document.getElementById("responseOutput").innerText = data.response;
+        }
+    </script>
+</head>
+<body>
+    <h1>Chat with Pandora</h1>
+    <input type="text" id="messageInput" placeholder="Type your message here">
+    <button onclick="sendMessage()">Send</button>
+    <p id="responseOutput"></p>
+</body>
+</html>
