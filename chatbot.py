@@ -4,7 +4,6 @@
 
 import os
 import json
-from collections import deque
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from langchain_groq import ChatGroq
 import datetime
@@ -15,16 +14,13 @@ import gradio as gr
 # Helper Functions & Global Setup
 # -------------------------------
 
-# File to store user data
 USER_DATA_FILE = "user_data.json"
 
-# University mental health resources
 UNIVERSITY_RESOURCES = {
     "Centennial College": "Visit the Student Wellness Centre: https://www.centennialcollege.ca/student-health",
     "University of Toronto": "Check U of T’s mental health services: https://mentalhealth.utoronto.ca/",
 }
 
-# Motivational quotes for students
 MOTIVATIONAL_QUOTES = [
     "Stay focused! Every small step brings you closer to success. 💪",
     "You’re capable of amazing things—keep pushing forward!",
@@ -35,16 +31,16 @@ def load_user_data():
     if os.path.exists(USER_DATA_FILE):
         with open(USER_DATA_FILE, "r") as file:
             return json.load(file)
-    return {}
+    return {}  # Return empty dict if file doesn't exist
 
 def save_user_data(user_data):
     with open(USER_DATA_FILE, "w") as file:
-        json.dump(user_data, file, indent=4)
+        json.dump(user_data, file, indent=4)  # indent=4 makes JSON human-readable
 
 def update_user_data(user_id, key, value):
     user_data = load_user_data()
     if user_id not in user_data:
-        user_data[user_id] = {}
+        user_data[user_id] = {}  # Initialize empty dict for new user
     user_data[user_id][key] = value
     save_user_data(user_data)
 
@@ -52,6 +48,7 @@ def update_student_profile(user_id, major, year_of_study, common_stressors, univ
     user_data = load_user_data()
     if user_id not in user_data:
         user_data[user_id] = {}
+    # Store all profile details in user's data
     user_data[user_id]["major"] = major
     user_data[user_id]["year_of_study"] = year_of_study
     user_data[user_id]["common_stressors"] = common_stressors
@@ -60,6 +57,7 @@ def update_student_profile(user_id, major, year_of_study, common_stressors, univ
 
 def get_mental_health_resources(user_id):
     user_data = load_user_data()
+    # Default to generic message if university not specified
     university = user_data.get(user_id, {}).get("university", "your university")
     if university in UNIVERSITY_RESOURCES:
         return f"If you need support, check out {UNIVERSITY_RESOURCES[university]}"
@@ -70,6 +68,7 @@ def analyze_sentiment(text):
     analyzer = SentimentIntensityAnalyzer()
     sentiment_scores = analyzer.polarity_scores(text)
     compound_score = sentiment_scores["compound"]
+    # Classify sentiment based on compound score thresholds
     if compound_score <= -0.5:
         return "sad"
     elif -0.5 < compound_score <= -0.1:
@@ -83,9 +82,9 @@ def analyze_sentiment(text):
 
 def load_llm():
     return ChatGroq(
-        temperature=0.6,
+        temperature=0.6,  # Controls randomness; 0.6 balances creativity and coherence
         groq_api_key="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",
-        model_name="llama-3.3-70b-versatile"
+        model_name="llama-3.3-70b-versatile"  # Specific LLM model used
     )
 
 def generate_summary(conversation_history, llm):
@@ -104,6 +103,7 @@ def check_deadlines(user_id):
     user_data = load_user_data()
     deadlines = user_data.get(user_id, {}).get("deadlines", {})
     today = datetime.date.today()
+    # Check for deadlines within next 3 days
     upcoming = [
         task for task, date in deadlines.items()
         if datetime.date.fromisoformat(date) <= today + datetime.timedelta(days=3)
@@ -113,7 +113,7 @@ def check_deadlines(user_id):
     return "No major deadlines soon. Keep up the good work!"
 
 def send_daily_motivation():
-    return random.choice(MOTIVATIONAL_QUOTES)
+    return random.choice(MOTIVATIONAL_QUOTES)  # Randomly select a quote
 
 # -----------------------------------------
 # Chatbot Function for Gradio Interface
@@ -125,52 +125,53 @@ def chatbot_response(user_message, history, user_id):
     and the user_id. It constructs a conversation prompt (as a string) for the LLM,
     updates the internal history, and returns the UI history in the expected format.
     """
-    # Initialize the LLM
     llm = load_llm()
-
-    # Load stored user data
     user_data = load_user_data()
-    major = user_data.get(user_id, {}).get("major", "student")
+    major = user_data.get(user_id, {}).get("major", "student")  # Default to "student" if no major
 
-    # Build the conversation as a list of message dictionaries
     messages = []
 
-    # Add a system message for overall context
-    messages.append({
-        "role": "system",
-        "content": (
-            f"You are a mental health assistant for students. The user is studying {major}.\n"
-            f"- Name: {user_id}\n"
-            f"- Last emotion: {user_data.get(user_id, {}).get('last_emotion', 'None')}\n"
-            f"- Last conversation: {user_data.get(user_id, {}).get('last_conversation', 'None')}\n\n"
-            "Respond with empathy and helpful advice. Keep your responses brief and focused.\n"
-            "Ask at most one follow-up question per response. Prioritize clarity and conciseness."
-        )
-    })
+    # Construct system message with user context
+    system_content = (
+        f"You are a mental health assistant for students. The user is studying {major}.\n"
+        f"- Name: {user_id}\n"
+        f"- Last emotion: {user_data.get(user_id, {}).get('last_emotion', 'None')}\n"
+        f"- Last conversation: {user_data.get(user_id, {}).get('last_conversation', 'None')}\n\n"
+        "Respond with empathy and helpful advice. Keep your responses brief and focused.\n"
+        "Ask at most one follow-up question per response. Prioritize clarity and conciseness."
+    )
 
-    # Add the conversation history
+    if "schedule" in user_message.lower():
+        deadline_info = check_deadlines(user_id)
+        system_content += f"\n- Upcoming deadlines: {deadline_info}\nInclude these deadlines in your response."
+
+    sentiment = analyze_sentiment(user_message)
+    if sentiment in ["sad", "frustrated"] or "help" in user_message.lower():
+        resource_info = get_mental_health_resources(user_id)
+        system_content += f"\n- Mental health resources: {resource_info}\nIf resources are provided, include them in your response to support the user."
+
+    messages.append({"role": "system", "content": system_content})
+
+    # Add history to messages
     for pair in history:
         user_text, bot_text = pair
         messages.append({"role": "user", "content": user_text})
         messages.append({"role": "assistant", "content": bot_text})
 
-    # Add the new user message
     messages.append({"role": "user", "content": user_message})
 
-    # Convert the list of message dictionaries to a single prompt string.
+    # Convert messages list to a single string for LLM
     prompt_str = ""
     for msg in messages:
         role = msg["role"].capitalize()
         prompt_str += f"{role}: {msg['content']}\n"
 
-    # Invoke the LLM with the concatenated prompt string
     response = llm.invoke(prompt_str)
     bot_reply = response.content.strip()
 
-    # Update the internal conversation history (list of tuples)
     history.append((user_message, bot_reply))
 
-    # Convert history into the UI format (list of dictionaries with "role" and "content")
+    # Format history for Gradio UI
     ui_history = []
     for pair in history:
         ui_history.append({"role": "user", "content": pair[0]})
@@ -181,6 +182,17 @@ def chatbot_response(user_message, history, user_id):
 # ----------------------------
 # Gradio Blocks UI Definition
 # -----------------------------
+
+def setup_profile(name, major_val, year, stressors, univ):
+    """
+    Save the profile to our JSON file and update the user_id state.
+    """
+    if not name.strip():
+        return "Please enter a valid name.", ""  # Validate non-empty name
+    update_user_data(name, "name", name)
+    update_student_profile(name, major_val, year, stressors, univ)
+    status = f"Profile set up for {name}. Welcome!"
+    return status, name  # Return status and user_id
 
 def main():
     with gr.Blocks() as demo:
@@ -202,20 +214,8 @@ def main():
             msg = gr.Textbox(label="Your Message")
             clear = gr.Button("Clear Chat")
 
-        # Gradio States to hold conversation history and the current user id
-        state = gr.State([])
-        user_id_state = gr.State("")
-
-        def setup_profile(name, major_val, year, stressors, univ):
-            """
-            Save the profile to our JSON file and update the user_id state.
-            """
-            if not name.strip():
-                return "Please enter a valid name.", ""
-            update_user_data(name, "name", name)
-            update_student_profile(name, major_val, year, stressors, univ)
-            status = f"Profile set up for {name}. Welcome!"
-            return status, name
+        state = gr.State([])  # Stores internal conversation history
+        user_id_state = gr.State("")  # Tracks current user ID
 
         setup_button.click(
             setup_profile,
@@ -227,10 +227,9 @@ def main():
             return chatbot_response(message, chat_history, user_id)
 
         msg.submit(respond, [msg, state, user_id_state], [chatbot, state])
-        clear.click(lambda: ([], []), None, [chatbot, state])
+        clear.click(lambda: ([], []), None, [chatbot, state])  # Reset both UI and internal history
 
-    # Launch the Gradio demo!
-    demo.launch(share=True)
+    demo.launch(share=True)  # Share=True generates a public URL
 
 if __name__ == "__main__":
     main()
